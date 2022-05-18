@@ -26,7 +26,8 @@ from scipy.stats import pearsonr, wilcoxon, mannwhitneyu
 from functions import computeSpeedTuningCurves
     
 
-data_directory = '/media/DataDhruv/Recordings/B0800/B0801'
+data_directory = '/media/DataDhruv/Recordings/A8500/A8504'
+
 datasets = np.loadtxt(os.path.join(data_directory,'VTE_dataset.list'), delimiter = '\n', dtype = str, comments = '#')
 
 BIGGER_SIZE = 14
@@ -63,7 +64,7 @@ for s in datasets:
     
     pass_ep = nts.IntervalSet(start = passes['start'], end = passes['end'])
     
-    file = [f for f in listdir if 'VTE_fwd' in f]
+    file = [f for f in listdir if 'VTE' in f]
     vtedata = scipy.io.loadmat(os.path.join(filepath,file[0]))
 
     xpos = vtedata['x']
@@ -190,14 +191,14 @@ for s in datasets:
     
     #COMPUTE FIRING RATE DURING A PASS FOR EACH CELL
     passrate = pd.DataFrame(index = range(len(pass_ep)) , columns = spikes.keys() )
-          
+    
     
     for i in range(len(pass_ep)):
         for j in spikes.keys() :
-    #     # plt.figure()
-    #     # plt.axis('off')
-    #     # plt.plot(xpos,ypos,'silver', zorder = 1)
-    #     # plt.plot(position['x'].restrict(pass_ep.loc[[i]]), position['z'].restrict(pass_ep.loc[[i]]))
+            # plt.figure()
+            # plt.axis('off')
+            # plt.plot(xpos,ypos,'silver', zorder = 1)
+            # plt.plot(position['x'].restrict(pass_ep.loc[[i]]), position['z'].restrict(pass_ep.loc[[i]]))
             r2 = len(spikes[j].restrict(pass_ep.loc[[i]]))/pass_ep.loc[[i]].tot_length('s')
             passrate[j][i] = r2
             
@@ -218,11 +219,11 @@ for s in datasets:
             shu_p.append(p_shu)
         plt.figure()
         plt.title('Corr between pass FR v/s zIdPhi_Neuron_' + str(i+1) +'_' + s)
-        plt.scatter(z1[0],passrate[i], label = 'R =  ' +  str(round(corr,4)))
+        plt.scatter(z1[0], passrate[i], label = 'R =  ' +  str(round(corr,4)))
         plt.legend(loc = 'upper right')
-        plt.ylabel('Pass FR (Hz)')
+        plt.ylabel('log FR')
         plt.xlabel('zIdPhi')
-        # plt.xticks([-1, 0, 1, 2])
+        plt.xticks([-1, 0, 1, 2])
         sessioncorrs.append(corr)
         sessionp.append(pvalue)
         allcorrs.append(corr)

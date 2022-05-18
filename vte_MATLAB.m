@@ -1,10 +1,10 @@
 %Load tracking data 
-position = importdata('B0801-211118_3.csv');
-t = position.data(:,2);
-x = position.data(:,6);
-y = position.data(:,8);
+position = importdata('1820-211231_3_posMATLAB.csv');
+t = position.data(:,1);
+x = position.data(:,2);
+y = position.data(:,3);
 
-epochs = importdata('B0801-211118_fwd.csv');
+epochs = importdata('1820-211231_3_fwd.csv');
 start = epochs.data(:,1); 
 fin = epochs.data(:,2);
 

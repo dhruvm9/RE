@@ -26,7 +26,7 @@ from functions import computeSpeedTuningCurves
 import statsmodels.api as sm
     
 
-data_directory = '/media/DataDhruv/Recordings/B0800/B0801'
+data_directory = '/media/DataDhruv/Recordings/A8500/A8504'
 datasets = np.loadtxt(os.path.join(data_directory,'VTE_dataset.list'), delimiter = '\n', dtype = str, comments = '#')
 
 BIGGER_SIZE = 14
@@ -41,6 +41,10 @@ allwilxp = []
 
 allbeta_speed = []
 allbeta_vte = []
+allbeta_dur = []
+
+sesscorr = []
+sessp = []
 
 # allpassrates = {}
 
@@ -65,8 +69,10 @@ for s in datasets:
         
     pass_ep = nts.IntervalSet(start = passes['start'], end = passes['end'])
     
-    file = [f for f in listdir if 'VTE_fwd' in f]
+    # file = [f for f in listdir if 'VTE_fwd' in f]
+    file = [f for f in listdir if 'VTE' in f]
     vtedata = scipy.io.loadmat(os.path.join(filepath,file[0]))
+    # vtedata = scipy.io.loadmat(os.path.join(filepath,file))
 
     xpos = vtedata['x']
     ypos = vtedata['y']
@@ -137,29 +143,37 @@ for s in datasets:
             # plt.axis('off')
             # plt.plot(xpos,ypos,'silver', zorder = 1)
             # plt.plot(position['x'].restrict(pass_ep.loc[[i]]), position['z'].restrict(pass_ep.loc[[i]]))
-            r2 = len(spikes[j].restrict(pass_ep.loc[[i]]))/pass_ep.loc[[i]].tot_length('s')
-            passrate[j][i] = r2
             
+            
+            # r2 = len(spikes[j].restrict(pass_ep.loc[[i]]))/pass_ep.loc[[i]].tot_length('s')
+                            
+            r2 = np.mean (1 / np.diff(spikes[j].restrict(pass_ep.loc[[i]]).index.values))
+            passrate[j][i] = r2
+    
+    p2 = passrate.dropna(axis = 1)
+    
     #CORRELATION BETWEEN PASS FR AND zIdPhi
     sessioncorrs = []
     sessionvcorrs = []
     sessionp = []
     sessionvp = []
     
-    for i in spikes.keys():
-        corr, pvalue = pearsonr(passrate[i],z1[0])
-        # plt.figure()
-        # plt.title('Corr between pass FR v/s zIdPhi_Neuron_' + str(i+1) +'_' + s)
-        # plt.scatter(z1[0],passrate[i], label = 'R =  ' +  str(round(corr,4)))
-        # plt.legend(loc = 'upper right')
-        # plt.xlabel('Pass FR')
-        # plt.ylabel('zIdPhi')
+    for i in p2.columns:
+        corr, pvalue = pearsonr(p2[i],z1[0])
+        
+        # if s == 'A8504-210706a':
+        #     plt.figure()
+        #     plt.title('Corr between pass FR v/s zIdPhi_Neuron_' + str(i+1) +'_' + s)
+        #     plt.scatter(z1[0],p2[i], label = 'R =  ' +  str(round(corr,4)))
+        #     plt.legend(loc = 'upper right')
+        #     plt.xlabel('Pass FR')
+        #     plt.ylabel('zIdPhi')
         sessioncorrs.append(corr)
         sessionp.append(pvalue)
         allcorrs.append(corr)
         allpvals.append(pvalue)
         
-        vcorr, vp = pearsonr(passrate[i],avg_v)
+        vcorr, vp = pearsonr(p2[i],avg_v)
         sessionvcorrs.append(vcorr)
         sessionvp.append(vp)
         allvcorrs.append(vcorr)
@@ -172,56 +186,90 @@ for s in datasets:
         # plt.ylabel('Pass FR (Hz)')
         # plt.xlabel('Velocity (cm/s)')
         
+        #Duration of trials
+
+    dur = np.zeros(len(pass_ep))
+    for i in pass_ep.index.values:
+        dur[i] = (pass_ep.iloc[i]['end'] - pass_ep.iloc[i]['start']) / 1e6
+        
+    corr, p = pearsonr(dur,z1[0])
+    sesscorr.append(corr)
+    sessp.append(p)
     
 ###############################################################################
 ####BEGIN GLM
 ###############################################################################
     x1 = z1[0]
     x2 = avg_v
+    x3 = dur
     
-    x_glm = pd.DataFrame(list(zip(x1, x2)), columns = ['vte', 'speed'])
+    # x_glm = pd.DataFrame(list(zip(x1, x2)), columns = ['vte', 'speed'])
+    x_glm = pd.DataFrame(list(zip(x1, x3)), columns = ['vte', 'dur'])
     
     beta_vte = []
     beta_speed = []
+    beta_dur = []
     
-    for i in spikes.keys():
-        y_glm = pd.DataFrame(passrate[i].values, columns = ['PassFR'])
+    for i in p2.columns:
+        y_glm = pd.DataFrame(p2[i].values, columns = ['PassFR'])
         model= sm.GLM(y_glm.astype(float), x_glm.astype(float), family=sm.families.Poisson())
         r = model.fit(link=sm.genmod.families.links.Log)
         beta_vte.append(r.params[0])
         allbeta_vte.append(r.params[0])
-        beta_speed.append(r.params[1])
-        allbeta_speed.append(r.params[1])
+        # beta_speed.append(r.params[1])
+        # allbeta_speed.append(r.params[1])
+        beta_dur.append(r.params[1])
+        allbeta_dur.append(r.params[1])
     
 abs_beta_vte = [abs(ele) for ele in allbeta_vte]
 abs_beta_speed = [abs(ele) for ele in allbeta_speed]
+abs_beta_dur = [abs(ele) for ele in allbeta_dur]
         
-z,p_glm = wilcoxon(abs_beta_speed, abs_beta_vte)
+# z,p_glm = wilcoxon(abs_beta_speed, abs_beta_vte)
+z,p2_glm = wilcoxon(abs_beta_dur, abs_beta_vte)
+
 means_speed = np.nanmean(abs_beta_speed)
 means_vte = np.nanmean(abs_beta_vte)
+means_dur = np.nanmean(abs_beta_dur)
 
 label = ['All units over 4 sessions']
 x = np.arange(len(label))  # the label locations
 width = 0.35  # the width of the bars
 
-
+#figure 1 
 fig, ax = plt.subplots()
 rects1 = ax.bar(x - width/2, means_vte, width, label='zIdPhi')
-rects2 = ax.bar(x + width/2, means_speed, width, label='speed')
+rects2 = ax.bar(x + width/2, means_dur, width, label='trial duration')
 
-pval = np.vstack([(abs_beta_vte), (abs_beta_speed)])
+pval = np.vstack([(abs_beta_vte), (abs_beta_dur)])
 
 x2 = [x-width/2, x+width/2]
 plt.plot(x2, np.vstack(pval), 'o-', color = 'k')
 
 # Add some text for labels, title and custom x-axis tick labels, etc.
 ax.set_ylabel('GLM |beta| value')
-ax.set_title('GLM for speed v/s zIdPhi')
+ax.set_title('GLM for trial duration v/s zIdPhi')
 ax.set_xticks(x)
 ax.set_xticklabels(label)
 ax.legend(loc = 'upper right')
 
 fig.tight_layout()        
     
-    
-    
+#figure 2 
+# fig, ax = plt.subplots()
+# rects1 = ax.bar(x - width/2, means_vte, width, label='zIdPhi')
+# rects2 = ax.bar(x + width/2, means_speed, width, label='speed')
+
+# pval = np.vstack([(abs_beta_vte), (abs_beta_speed)])
+
+# x2 = [x-width/2, x+width/2]
+# plt.plot(x2, np.vstack(pval), 'o-', color = 'k')
+
+# # Add some text for labels, title and custom x-axis tick labels, etc.
+# ax.set_ylabel('GLM |beta| value')
+# ax.set_title('GLM for speed v/s zIdPhi')
+# ax.set_xticks(x)
+# ax.set_xticklabels(label)
+# ax.legend(loc = 'upper right')
+
+# fig.tight_layout()    
